@@ -2,6 +2,11 @@ import { browser } from '$app/environment';
 import type { WeightUnit } from '$lib/types';
 import { FALLBACK_SCHEME_ID } from '$lib/services/warmup';
 import { FALLBACK_BAR_WEIGHT, FALLBACK_PLATES } from '$lib/services/plates';
+import {
+	FALLBACK_REMINDER_HOUR,
+	FALLBACK_REMINDER_MINUTE,
+	FALLBACK_REMINDER_WEEKDAY_MASK
+} from '$lib/services/reminders';
 
 /**
  * App preferences, the web equivalent of Bane's `UserDefaults`/`AppStorage`
@@ -18,6 +23,14 @@ export interface Settings {
 	plateAvailablePlates: number[];
 	/** Earned-achievement ids already shown to the user (for "new" flags). */
 	seenAchievements: string[];
+	/** Opt-in weekly workout reminder, off by default. */
+	reminderEnabled: boolean;
+	reminderHour: number;
+	reminderMinute: number;
+	/** Packed `Weekday` bitmask, see `$lib/services/reminders`. */
+	reminderWeekdayMask: number;
+	/** `YYYY-MM-DD` the reminder last fired on, so it fires at most once a day. */
+	reminderLastFiredOn: string | null;
 }
 
 const DEFAULTS: Settings = {
@@ -27,7 +40,12 @@ const DEFAULTS: Settings = {
 	warmupRounding: 5,
 	plateBarWeight: FALLBACK_BAR_WEIGHT,
 	plateAvailablePlates: FALLBACK_PLATES,
-	seenAchievements: []
+	seenAchievements: [],
+	reminderEnabled: false,
+	reminderHour: FALLBACK_REMINDER_HOUR,
+	reminderMinute: FALLBACK_REMINDER_MINUTE,
+	reminderWeekdayMask: FALLBACK_REMINDER_WEEKDAY_MASK,
+	reminderLastFiredOn: null
 };
 
 const KEY = 'bane-lite.settings';
