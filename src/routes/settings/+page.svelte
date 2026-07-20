@@ -4,9 +4,21 @@
 	import { WARMUP_SCHEMES } from '$lib/services/warmup';
 	import { SELECTABLE_PLATES, BAR_PRESETS, formatPlate } from '$lib/services/plates';
 	import { WEEKDAYS, notificationsSupported, requestReminderPermission } from '$lib/services/reminders';
+	import { workoutsToCSV, workoutsFromCSV } from '$lib/services/csv';
 	import { db } from '$lib/db/db';
 
 	let fileInput: HTMLInputElement | undefined = $state();
+	let csvFileInput: HTMLInputElement | undefined = $state();
+
+	function downloadBlob(contents: string, type: string, filename: string) {
+		const blob = new Blob([contents], { type });
+		const url = URL.createObjectURL(blob);
+		const a = document.createElement('a');
+		a.href = url;
+		a.download = filename;
+		a.click();
+		URL.revokeObjectURL(url);
+	}
 
 	function pad(n: number): string {
 		return String(n).padStart(2, '0');
@@ -57,13 +69,29 @@
 			routines,
 			measurements
 		};
-		const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
-		const url = URL.createObjectURL(blob);
-		const a = document.createElement('a');
-		a.href = url;
-		a.download = 'bane-lite-backup.json';
-		a.click();
-		URL.revokeObjectURL(url);
+		downloadBlob(JSON.stringify(payload, null, 2), 'application/json', 'bane-lite-backup.json');
+	}
+
+	async function exportCSV() {
+		const [exercises, workouts] = await Promise.all([db.exercises.toArray(), db.workouts.toArray()]);
+		downloadBlob(workoutsToCSV(workouts, exercises), 'text/csv', 'bane-lite-workouts.csv');
+	}
+
+	async function importCSVFile(e: Event) {
+		const input = e.currentTarget as HTMLInputElement;
+		const file = input.files?.[0];
+		if (!file) return;
+		try {
+			const text = await file.text();
+			const exercises = await db.exercises.toArray();
+			const workouts = workoutsFromCSV(text, exercises);
+			await db.workouts.bulkPut(workouts);
+			alert('Import complete.');
+		} catch {
+			alert('Could not import that file.');
+		} finally {
+			input.value = '';
+		}
 	}
 
 	async function importFile(e: Event) {
@@ -219,14 +247,23 @@
 	<div>
 		<div class="section-title">Data</div>
 		<div class="card stack">
-			<button class="btn btn-block" onclick={exportData}>Export data</button>
-			<button class="btn btn-block" onclick={() => fileInput?.click()}>Import data</button>
+			<button class="btn btn-block" onclick={exportData}>Export data (JSON)</button>
+			<button class="btn btn-block" onclick={() => fileInput?.click()}>Import data (JSON)</button>
 			<input
 				bind:this={fileInput}
 				type="file"
 				accept=".json"
 				style="display:none"
 				onchange={importFile}
+			/>
+			<button class="btn btn-block" onclick={exportCSV}>Export workout history (CSV)</button>
+			<button class="btn btn-block" onclick={() => csvFileInput?.click()}>Import workout history (CSV)</button>
+			<input
+				bind:this={csvFileInput}
+				type="file"
+				accept=".csv"
+				style="display:none"
+				onchange={importCSVFile}
 			/>
 			<button class="btn btn-block btn-danger" onclick={eraseAll}>Erase all data</button>
 		</div>
