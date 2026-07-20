@@ -30,8 +30,6 @@ export const WEEKDAYS: Weekday[] = [
 /** Default nudge time: 6:00 PM, a common post-work training slot. */
 export const FALLBACK_REMINDER_HOUR = 18;
 export const FALLBACK_REMINDER_MINUTE = 0;
-/** Mon / Wed / Fri out of the box, mirroring Bane's default cadence. */
-export const FALLBACK_REMINDER_WEEKDAY_MASK = (1 << 1) | (1 << 3) | (1 << 5);
 
 const NOTIFICATION_TAG = 'bane-workout-reminder';
 
@@ -42,10 +40,8 @@ export function weekdayMask(days: Iterable<number>): number {
 	return mask;
 }
 
-/** The weekday values selected in a packed mask, in calendar order. */
-export function daysFromMask(mask: number): number[] {
-	return WEEKDAYS.map((w) => w.value).filter((v) => (mask & (1 << v)) !== 0);
-}
+/** Mon / Wed / Fri out of the box, mirroring Bane's default cadence. */
+export const FALLBACK_REMINDER_WEEKDAY_MASK = weekdayMask([1, 3, 5]);
 
 export function notificationsSupported(): boolean {
 	return typeof window !== 'undefined' && 'Notification' in window;
