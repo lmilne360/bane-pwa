@@ -3,9 +3,37 @@
 	import { WEIGHT_UNITS, UNIT_DISPLAY_NAME } from '$lib/services/weight';
 	import { WARMUP_SCHEMES } from '$lib/services/warmup';
 	import { SELECTABLE_PLATES, BAR_PRESETS, formatPlate } from '$lib/services/plates';
+	import { WEEKDAYS, notificationsSupported, requestReminderPermission } from '$lib/services/reminders';
 	import { db } from '$lib/db/db';
 
 	let fileInput: HTMLInputElement | undefined = $state();
+
+	function pad(n: number): string {
+		return String(n).padStart(2, '0');
+	}
+
+	function toggleReminderDay(value: number) {
+		settings.reminderWeekdayMask ^= 1 << value;
+	}
+
+	function onReminderTimeChange(e: Event) {
+		const [h, m] = (e.currentTarget as HTMLInputElement).value.split(':').map(Number);
+		settings.reminderHour = h;
+		settings.reminderMinute = m;
+	}
+
+	async function onReminderToggle(e: Event) {
+		const checked = (e.currentTarget as HTMLInputElement).checked;
+		if (checked) {
+			const permission = await requestReminderPermission();
+			if (permission !== 'granted') {
+				alert('Enable notifications for this site in your browser settings to get workout reminders.');
+				(e.currentTarget as HTMLInputElement).checked = false;
+				return;
+			}
+		}
+		settings.reminderEnabled = checked;
+	}
 
 	function togglePlate(p: number) {
 		const set = new Set(settings.plateAvailablePlates);
@@ -137,6 +165,54 @@
 					{/each}
 				</div>
 			</div>
+		</div>
+	</div>
+
+	<div>
+		<div class="section-title">Reminders</div>
+		<div class="card stack">
+			<label class="hstack" style="justify-content:space-between">
+				<span>Weekly workout reminders</span>
+				<input
+					type="checkbox"
+					style="width:auto"
+					checked={settings.reminderEnabled}
+					onchange={onReminderToggle}
+				/>
+			</label>
+			{#if !notificationsSupported()}
+				<div class="faint" style="font-size:12px">
+					Notifications aren't supported in this browser.
+				</div>
+			{:else}
+				<div class="field">
+					<label for="reminder-time">Time</label>
+					<input
+						id="reminder-time"
+						type="time"
+						value={`${pad(settings.reminderHour)}:${pad(settings.reminderMinute)}`}
+						onchange={onReminderTimeChange}
+					/>
+				</div>
+				<div>
+					<span id="reminder-days-label">Days</span>
+					<div class="pills" aria-labelledby="reminder-days-label">
+						{#each WEEKDAYS as d (d.value)}
+							<button
+								class="pill"
+								aria-pressed={(settings.reminderWeekdayMask & (1 << d.value)) !== 0}
+								aria-label={d.label}
+								onclick={() => toggleReminderDay(d.value)}
+							>
+								{d.shortSymbol}
+							</button>
+						{/each}
+					</div>
+				</div>
+				<div class="faint" style="font-size:12px">
+					Fires when you open the app at or after the scheduled time on a selected day.
+				</div>
+			{/if}
 		</div>
 	</div>
 
