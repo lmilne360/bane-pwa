@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { workoutsStore, exercisesStore, exerciseMap } from '$lib/db/queries';
 	import { MUSCLES, MUSCLE_LABELS, type Muscle } from '$lib/types';
+	import BodyDiagram from '$lib/components/BodyDiagram.svelte';
+	import { FRONT_REGIONS, BACK_REGIONS, heatColor } from '$lib/services/muscleHeatMap';
 
 	type WindowOption = '30' | '90' | 'all';
 
@@ -40,6 +42,18 @@
 	);
 
 	const maxCount = $derived(Math.max(1, ...rows.map((r) => r.count)));
+
+	function intensity(muscle: Muscle): number {
+		return (counts.get(muscle) ?? 0) / maxCount;
+	}
+
+	const untrainedNames = $derived.by(() => {
+		const mapped = new Set([...FRONT_REGIONS, ...BACK_REGIONS].map((r) => r.muscle));
+		const trained = new Set(rows.map((r) => r.muscle));
+		return MUSCLES.filter((m) => mapped.has(m) && !trained.has(m)).map((m) => MUSCLE_LABELS[m]);
+	});
+
+	const legendGradient = Array.from({ length: 11 }, (_, i) => heatColor(i / 10)).join(', ');
 </script>
 
 <header class="page-header">
@@ -56,6 +70,17 @@
 	{#if rows.length === 0}
 		<div class="empty"><div class="big">🔥</div><div>No finished working sets in this window.</div></div>
 	{:else}
+		<div class="bodies">
+			<BodyDiagram regions={FRONT_REGIONS} {intensity} label="Front" />
+			<BodyDiagram regions={BACK_REGIONS} {intensity} label="Back" />
+		</div>
+
+		<div class="legend">
+			<span class="faint">Less</span>
+			<div class="legend-bar" style={`background:linear-gradient(to right, ${legendGradient})`}></div>
+			<span class="faint">More</span>
+		</div>
+
 		<div class="list">
 			{#each rows as row (row.muscle)}
 				{@const pct = Math.round((row.count / maxCount) * 100)}
@@ -63,20 +88,42 @@
 					<div class="row-main">
 						<div class="row-title">{MUSCLE_LABELS[row.muscle]}</div>
 						<div class="bar-track">
-							<div
-								class="bar-fill"
-								style={`width:${pct}%;background:color-mix(in srgb, var(--accent) ${pct}%, var(--surface-2))`}
-							></div>
+							<div class="bar-fill" style={`width:${pct}%;background:${heatColor(row.count / maxCount)}`}></div>
 						</div>
 					</div>
 					<span class="badge">{row.count}</span>
 				</div>
 			{/each}
 		</div>
+
+		{#if untrainedNames.length > 0}
+			<div class="card untrained">
+				<div class="row-title">Not trained this window</div>
+				<div class="row-sub">{untrainedNames.join(', ')}</div>
+			</div>
+		{/if}
 	{/if}
 </div>
 
 <style>
+	.bodies {
+		display: flex;
+		gap: 12px;
+	}
+	.bodies > :global(.body-diagram) {
+		flex: 1;
+		min-width: 0;
+	}
+	.legend {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+	}
+	.legend-bar {
+		flex: 1;
+		height: 8px;
+		border-radius: 999px;
+	}
 	.bar-track {
 		margin-top: 8px;
 		height: 8px;
@@ -87,5 +134,8 @@
 	.bar-fill {
 		height: 100%;
 		border-radius: 999px;
+	}
+	.untrained .row-sub {
+		margin-top: 4px;
 	}
 </style>
