@@ -3,7 +3,7 @@
 	import { page } from '$app/state';
 	import { routinesStore, exercisesStore, exerciseMap } from '$lib/db/queries';
 	import { saveRoutine } from '$lib/db/repository';
-	import type { Routine, RoutineItem, Exercise } from '$lib/types';
+	import type { Routine, RoutineItem, RoutineSet, Exercise } from '$lib/types';
 	import { settings } from '$lib/stores/settings.svelte';
 	import { weightValue, toPounds, UNIT_ABBREVIATION } from '$lib/services/weight';
 	import { DEFAULT_MIN_REPS, DEFAULT_MAX_REPS, DEFAULT_INCREMENT_POUNDS } from '$lib/services/progressiveOverload';
@@ -60,6 +60,28 @@
 		if (!routine) return;
 		routine.items = routine.items.filter((x) => x.id !== item.id);
 		ordered(routine).forEach((it, i) => (it.order = i));
+		persist();
+	}
+
+	function moveItem(item: RoutineItem, direction: -1 | 1) {
+		if (!routine) return;
+		const items = ordered(routine);
+		const index = items.findIndex((x) => x.id === item.id);
+		const target = index + direction;
+		if (index === -1 || target < 0 || target >= items.length) return;
+		const a = items[index];
+		const b = items[target];
+		[a.order, b.order] = [b.order, a.order];
+		persist();
+	}
+
+	function moveSet(item: RoutineItem, set: RoutineSet, direction: -1 | 1) {
+		const index = item.sets.findIndex((s) => s.id === set.id);
+		const target = index + direction;
+		if (index === -1 || target < 0 || target >= item.sets.length) return;
+		const [moved] = item.sets.splice(index, 1);
+		item.sets.splice(target, 0, moved);
+		item.sets.forEach((s, i) => (s.order = i));
 		persist();
 	}
 
@@ -129,9 +151,15 @@
 			</div>
 		</div>
 
-		{#each ordered(routine) as item (item.id)}
+		{#each ordered(routine) as item, itemIndex (item.id)}
 			<div class="card stack">
 				<div class="hstack">
+					<div class="move-btns">
+						<button class="move-btn" disabled={itemIndex === 0} aria-label="Move exercise up"
+							onclick={() => moveItem(item, -1)}>▲</button>
+						<button class="move-btn" disabled={itemIndex === routine.items.length - 1} aria-label="Move exercise down"
+							onclick={() => moveItem(item, 1)}>▼</button>
+					</div>
 					<div class="row-main">
 						<div class="row-title">{nameFor(item)}</div>
 						{#if item.exerciseId && map.get(item.exerciseId)}
@@ -141,7 +169,7 @@
 					<button class="btn-ghost btn-danger" onclick={() => removeItem(item)}>Remove</button>
 				</div>
 
-				<div class="set-head"><span>Set</span><span>Weight ({UNIT_ABBREVIATION[unit]})</span><span>Reps</span><span></span></div>
+				<div class="set-head"><span>Set</span><span>Weight ({UNIT_ABBREVIATION[unit]})</span><span>Reps</span><span></span><span></span></div>
 				{#each item.sets as set, i (set.id)}
 					<div class="set-row">
 						<span class="set-index">{i + 1}</span>
@@ -151,6 +179,12 @@
 						<input type="number" inputmode="numeric" min="0" placeholder="0"
 							value={set.targetReps || ''}
 							onchange={(e) => setTargetReps(set, e.currentTarget.value)} />
+						<div class="move-btns">
+							<button class="move-btn" disabled={i === 0} aria-label="Move set up"
+								onclick={() => moveSet(item, set, -1)}>▲</button>
+							<button class="move-btn" disabled={i === item.sets.length - 1} aria-label="Move set down"
+								onclick={() => moveSet(item, set, 1)}>▼</button>
+						</div>
 						<button class="set-del" aria-label="Delete set" onclick={() => removeSet(item, set.id)}>✕</button>
 					</div>
 				{/each}
@@ -216,7 +250,7 @@
 	.set-head,
 	.set-row {
 		display: grid;
-		grid-template-columns: 40px 1fr 1fr 32px;
+		grid-template-columns: 40px 1fr 1fr 28px 32px;
 		gap: 8px;
 		align-items: center;
 	}

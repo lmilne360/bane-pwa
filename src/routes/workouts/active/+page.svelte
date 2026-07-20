@@ -10,7 +10,7 @@
 		saveWorkout,
 		deleteWorkout
 	} from '$lib/db/repository';
-	import type { Workout, WorkoutExercise, Exercise } from '$lib/types';
+	import type { Workout, WorkoutExercise, SetEntry, Exercise } from '$lib/types';
 	import { settings } from '$lib/stores/settings.svelte';
 	import { restTimer } from '$lib/stores/restTimer.svelte';
 	import { weightValue, toPounds, UNIT_ABBREVIATION } from '$lib/services/weight';
@@ -84,6 +84,28 @@
 		if (!workout) return;
 		workout.exercises = workout.exercises.filter((x) => x.id !== we.id);
 		normalizeSupersets(orderedExercises(workout));
+		persist();
+	}
+
+	function moveExercise(we: WorkoutExercise, direction: -1 | 1) {
+		if (!workout) return;
+		const index = ordered.findIndex((x) => x.id === we.id);
+		const target = index + direction;
+		if (index === -1 || target < 0 || target >= ordered.length) return;
+		const a = ordered[index];
+		const b = ordered[target];
+		[a.order, b.order] = [b.order, a.order];
+		normalizeSupersets(orderedExercises(workout));
+		persist();
+	}
+
+	function moveSet(we: WorkoutExercise, set: SetEntry, direction: -1 | 1) {
+		const index = we.sets.findIndex((s) => s.id === set.id);
+		const target = index + direction;
+		if (index === -1 || target < 0 || target >= we.sets.length) return;
+		const [moved] = we.sets.splice(index, 1);
+		we.sets.splice(target, 0, moved);
+		we.sets.forEach((s, i) => (s.order = i));
 		persist();
 	}
 
@@ -182,6 +204,12 @@
 					<div class="superset-badge">Superset {badge.letter} · {badge.index} of {badge.count}</div>
 				{/if}
 				<div class="hstack">
+					<div class="move-btns">
+						<button class="move-btn" disabled={ordered.findIndex((x) => x.id === we.id) === 0}
+							aria-label="Move exercise up" onclick={() => moveExercise(we, -1)}>▲</button>
+						<button class="move-btn" disabled={ordered.findIndex((x) => x.id === we.id) === ordered.length - 1}
+							aria-label="Move exercise down" onclick={() => moveExercise(we, 1)}>▼</button>
+					</div>
 					<div class="row-main">
 						<div class="row-title">{nameFor(we)}</div>
 						{#if we.exerciseId && map.get(we.exerciseId)}
@@ -201,6 +229,7 @@
 						<span>Set</span>
 						<span>Weight ({UNIT_ABBREVIATION[unit]})</span>
 						<span>Reps</span>
+						<span></span>
 						<span></span>
 						<span></span>
 					</div>
@@ -239,6 +268,12 @@
 								aria-label="Complete set"
 								onclick={() => toggleComplete(we, set)}>✓</button
 							>
+							<div class="move-btns">
+								<button class="move-btn" disabled={i === 0} aria-label="Move set up"
+									onclick={() => moveSet(we, set, -1)}>▲</button>
+								<button class="move-btn" disabled={i === we.sets.length - 1} aria-label="Move set down"
+									onclick={() => moveSet(we, set, 1)}>▼</button>
+							</div>
 							<button class="set-del" aria-label="Delete set" onclick={() => removeSet(we, set.id)}>✕</button>
 						</div>
 					{/each}
@@ -338,7 +373,7 @@
 	.set-head,
 	.set-row {
 		display: grid;
-		grid-template-columns: 44px 1fr 1fr 44px 32px;
+		grid-template-columns: 44px 1fr 1fr 44px 28px 32px;
 		gap: 8px;
 		align-items: center;
 	}
