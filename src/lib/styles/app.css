@@ -195,6 +195,30 @@ textarea:focus {
 	font-size: 14px;
 }
 
+/* Reorder controls: stacked up/down arrows for move-up/move-down actions. */
+.move-btns {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+}
+.move-btn {
+	width: 26px;
+	height: 18px;
+	padding: 0;
+	border: 1px solid var(--border);
+	background: var(--surface-2);
+	color: var(--text-dim);
+	border-radius: 4px;
+	font-size: 9px;
+	line-height: 1;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+.move-btn:disabled {
+	opacity: 0.3;
+}
+
 /* Pills / segmented */
 .pills {
 	display: flex;
