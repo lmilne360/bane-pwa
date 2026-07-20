@@ -15,6 +15,19 @@
 	import { restTimer } from '$lib/stores/restTimer.svelte';
 	import { weightValue, toPounds, UNIT_ABBREVIATION } from '$lib/services/weight';
 	import { CATEGORY_LABELS } from '$lib/types';
+	import {
+		exerciseGroups,
+		supersetLetters,
+		supersetWithNext,
+		leaveSuperset,
+		normalizeSupersets
+	} from '$lib/services/supersets';
+
+	interface SupersetBadge {
+		letter: string;
+		index: number;
+		count: number;
+	}
 
 	let workout = $state<Workout | null>(null);
 	let loading = $state(true);
@@ -23,6 +36,9 @@
 
 	const map = $derived(exerciseMap($exercisesStore));
 	const unit = $derived(settings.weightUnit);
+	const ordered = $derived(workout ? orderedExercises(workout) : []);
+	const groups = $derived(exerciseGroups(ordered));
+	const letters = $derived(supersetLetters(groups));
 
 	$effect(() => {
 		let cancelled = false;
@@ -67,6 +83,22 @@
 	function removeExercise(we: WorkoutExercise) {
 		if (!workout) return;
 		workout.exercises = workout.exercises.filter((x) => x.id !== we.id);
+		normalizeSupersets(orderedExercises(workout));
+		persist();
+	}
+
+	function hasNext(we: WorkoutExercise): boolean {
+		const index = ordered.findIndex((x) => x.id === we.id);
+		return index !== -1 && index + 1 < ordered.length;
+	}
+
+	function linkWithNext(we: WorkoutExercise) {
+		supersetWithNext(ordered, we);
+		persist();
+	}
+
+	function unlink(we: WorkoutExercise) {
+		leaveSuperset(ordered, we);
 		persist();
 	}
 
@@ -144,8 +176,11 @@
 			<a class="btn btn-accent" href="/workouts">Back to Workouts</a>
 		</div>
 	{:else}
-		{#each orderedExercises(workout) as we (we.id)}
+		{#snippet exerciseCard(we: WorkoutExercise, badge: SupersetBadge | null)}
 			<div class="card exercise">
+				{#if badge}
+					<div class="superset-badge">Superset {badge.letter} · {badge.index} of {badge.count}</div>
+				{/if}
 				<div class="hstack">
 					<div class="row-main">
 						<div class="row-title">{nameFor(we)}</div>
@@ -153,6 +188,11 @@
 							<div class="row-sub">{CATEGORY_LABELS[map.get(we.exerciseId)!.category]}</div>
 						{/if}
 					</div>
+					{#if we.supersetGroup}
+						<button class="btn-ghost" onclick={() => unlink(we)}>Unlink</button>
+					{:else if hasNext(we)}
+						<button class="btn-ghost" onclick={() => linkWithNext(we)}>+ Superset</button>
+					{/if}
 					<button class="btn-ghost btn-danger" onclick={() => removeExercise(we)}>Remove</button>
 				</div>
 
@@ -206,6 +246,22 @@
 
 				<button class="btn btn-sm btn-block" onclick={() => addSet(we)}>+ Add Set</button>
 			</div>
+		{/snippet}
+
+		{#each groups as group (group[0].id)}
+			{#if group.length > 1}
+				<div class="superset-block">
+					{#each group as we, i (we.id)}
+						{@render exerciseCard(we, {
+							letter: letters.get(we.supersetGroup ?? '') ?? '',
+							index: i + 1,
+							count: group.length
+						})}
+					{/each}
+				</div>
+			{:else}
+				{@render exerciseCard(group[0], null)}
+			{/if}
 		{/each}
 
 		<button class="btn btn-accent btn-block" onclick={() => (showPicker = true)}>+ Add Exercise</button>
@@ -254,6 +310,25 @@
 		display: flex;
 		flex-direction: column;
 		gap: 10px;
+	}
+	.superset-block {
+		display: flex;
+		flex-direction: column;
+		gap: 8px;
+		padding: 8px;
+		border: 1px solid var(--blue);
+		border-radius: var(--radius);
+	}
+	.superset-block .exercise {
+		border-color: var(--blue);
+	}
+	.superset-badge {
+		display: inline-block;
+		font-size: 11px;
+		font-weight: 700;
+		text-transform: uppercase;
+		letter-spacing: 0.04em;
+		color: var(--blue);
 	}
 	.sets {
 		display: flex;
